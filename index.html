@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#800020">
+  <title>Scanner MUSWIL XI PPNI Jatim</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 22px 16px; font-family: Arial, sans-serif; background: #f4f5f7; color: #252525; }
+    main { max-width: 520px; margin: 0 auto; background: #fff; padding: 22px; border-radius: 16px; box-shadow: 0 5px 24px #00000012; text-align: center; }
+    h1 { margin: 0; color: #800020; font-size: 23px; }
+    .sub { margin: 8px 0 20px; color: #555; font-size: 14px; }
+    #reader { width: 100%; max-width: 440px; margin: 0 auto; }
+    #status { white-space: pre-line; margin: 18px 0; padding: 14px; border-radius: 10px; background: #f1f1f1; min-height: 52px; line-height: 1.5; }
+    button { border: 0; border-radius: 9px; padding: 13px 18px; font-size: 16px; font-weight: 700; background: #800020; color: white; width: 100%; cursor: pointer; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .hint { font-size: 12px; color: #666; line-height: 1.5; margin-top: 16px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>ABSENSI MUSWIL XI</h1>
+  <div class="sub">DPW PPNI PROVINSI JAWA TIMUR</div>
+  <div id="reader"></div>
+  <div id="status">Tekan tombol “Buka Kamera” untuk mulai memindai QR peserta.</div>
+  <button id="startBtn" type="button">Buka Kamera</button>
+  <div class="hint">Gunakan Chrome pada Android dan izinkan akses kamera. Halaman ini perlu dibuka melalui GitHub Pages (HTTPS) dari aplikasi absensi.</div>
+</main>
+<script>
+  const statusBox = document.getElementById('status');
+  const startBtn = document.getElementById('startBtn');
+  const scanner = new Html5Qrcode('reader');
+  let scanning = false;
+  let waitingReply = false;
+
+  function setStatus(message) {
+    statusBox.textContent = message;
+  }
+
+  function receiveResult(event) {
+    if (event.source !== window.opener) return;
+    const data = event.data;
+    if (!data || data.type !== 'MUSWIL_SCAN_RESULT') return;
+    waitingReply = false;
+    const res = data.result || {};
+    let message = res.pesan || 'Tidak ada respons dari aplikasi.';
+    if (res.nama) message += '\\nNama: ' + res.nama;
+    if (res.dpd) message += '\\nAsal DPD: ' + res.dpd;
+    setStatus(message);
+    startBtn.disabled = false;
+    startBtn.textContent = 'Pindai Berikutnya';
+    setTimeout(() => {
+      if (scanning && !waitingReply) {
+        scanner.resume();
+        setStatus('Arahkan kamera ke QR Code peserta berikutnya.');
+      }
+    }, 1800);
+  }
+  window.addEventListener('message', receiveResult);
+
+  async function startCamera() {
+    if (!window.opener || window.opener.closed) {
+      setStatus('Halaman scanner harus dibuka dari tombol Buka Scanner pada aplikasi absensi.');
+      return;
+    }
+    startBtn.disabled = true;
+    setStatus('Meminta akses kamera...');
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+      if (!cameras || cameras.length === 0) throw new Error('Kamera tidak ditemukan pada perangkat.');
+      const rear = cameras.find(c => /back|rear|environment|belakang/i.test(c.label));
+      const cameraId = rear ? rear.id : cameras[cameras.length - 1].id;
+      if (!scanning) {
+        await scanner.start(
+          cameraId,
+          { fps: 10, qrbox: { width: 250, height: 190 }, aspectRatio: 1.3 },
+          async qr => {
+            if (waitingReply) return;
+            waitingReply = true;
+            setStatus('QR terbaca. Mengirim data ke aplikasi...');
+            try { await scanner.pause(true); } catch (e) {}
+            window.opener.postMessage({ type: 'MUSWIL_QR', qr: qr }, '*');
+          },
+          () => {}
+        );
+        scanning = true;
+      } else {
+        try { scanner.resume(); } catch (e) {}
+      }
+      setStatus('Kamera aktif. Arahkan ke QR Code peserta.');
+      startBtn.textContent = 'Kamera Aktif';
+      startBtn.disabled = false;
+    } catch (err) {
+      setStatus('Kamera tidak dapat dibuka: ' + (err && err.message ? err.message : err) +
+        '\\nPastikan izin kamera diberikan dan buka halaman melalui HTTPS.');
+      startBtn.disabled = false;
+      startBtn.textContent = 'Ulangi Buka Kamera';
+    }
+  }
+  startBtn.addEventListener('click', startCamera);
+</script>
+</body>
+</html>
