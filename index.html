@@ -46,8 +46,8 @@
     waitingReply = false;
     const res = data.result || {};
     let message = res.pesan || 'Tidak ada respons dari aplikasi.';
-    if (res.nama) message += '\\nNama: ' + res.nama;
-    if (res.dpd) message += '\\nAsal DPD: ' + res.dpd;
+    if (res.nama) message += '\nNama: ' + res.nama;
+    if (res.dpd) message += '\nAsal DPD: ' + res.dpd;
     setStatus(message);
     startBtn.disabled = false;
     startBtn.textContent = 'Pindai Berikutnya';
@@ -94,7 +94,7 @@
       startBtn.disabled = false;
     } catch (err) {
       setStatus('Kamera tidak dapat dibuka: ' + (err && err.message ? err.message : err) +
-        '\\nPastikan izin kamera diberikan dan buka halaman melalui HTTPS.');
+        '\nPastikan izin kamera diberikan dan buka halaman melalui HTTPS.');
       startBtn.disabled = false;
       startBtn.textContent = 'Ulangi Buka Kamera';
     }
